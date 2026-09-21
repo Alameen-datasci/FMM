@@ -1,0 +1,169 @@
+\[
+R_{l}^{m}(\mathbf{r}_{i})
+=
+\frac{1}{(l+m)!}
+\mathbf{r}_{i}^{l}
+P_{l}^{m}
+(\cos\theta_{i})
+e^{im\phi_{i}}
+\]
+
+we already allocated space for real and imaginary arrays, so we fill them like this
+
+\begin{itemize}
+    \item Diagonal terms
+    \item Off-Diagonal terms
+    \item General terms
+\end{itemize}
+
+\subsubsection*{The Diagonal Terms (m = l)}
+
+For the diagonal terms, we use the standard property of Associated Legendre Polynomials
+
+\[
+P_{l}^{l}
+=-(2l-1)\sin\theta
+P_{l-1}^{l-1}(\cos\theta)
+\]
+
+\[
+R_{l}^{l}
+=
+\frac{1}{(2l)!}
+\mathbf{r}^{l}
+\left[
+-(2l-1)\sin\theta
+P_{l-1}^{l-1}(\cos\theta)
+\right]
+e^{il\phi}
+\]
+
+\[
+R_{l}^{l}
+=
+\frac{-1}{2l}
+\mathbf{r}
+\sin\theta
+e^{i\phi}
+\left[
+\frac{1}{(2l-1)!}
+\mathbf{r}^{l-1}
+P_{l-1}^{l-1}
+(\cos\theta)
+e^{i(l-1)\phi}
+\right]
+\]
+
+\[
+R_{l}^{l}
+=
+\frac{-1}{2l}
+(x+iy)
+R_{l-1}^{l-1}
+\]
+
+\subsubsection*{The Off-Diagonal Terms (m = l - 1)}
+
+For the first sub-diagonal, the Legendre polynomial property is:
+
+\[
+P_{l}^{l-1}
+(\cos\theta)
+=
+\cos\theta
+(2l-1)
+P_{l-1}^{l-1}
+(\cos\theta)
+\]
+
+\[
+R_{l}^{l-1}
+=
+\frac{1}{(2l-1)!}
+\mathbf{r}^{l}
+\left[
+\cos\theta
+(2l-1)
+P_{l-1}^{l-1}
+(\cos\theta)
+\right]
+e^{i(l-1)\phi}
+\]
+
+\[
+R_{l}^{l-1}
+=
+\mathbf{r}\cos\theta
+\left[
+\frac{1}{(2l-1)!}
+\mathbf{r}^{l-1}
+P_{l-1}^{l-1}
+(\cos\theta)
+e^{i(l-1)\phi}
+\right]
+\]
+
+\[
+R_{l}^{l-1}
+=zR_{l-1}^{l-1}
+\]
+
+\subsubsection{The General Terms (0 $\leq$ m $\leq$ l - 1)}
+
+For all remaining terms, we rely on Bonnet's recursion formula for Associated Legendre Polynomials:
+
+\[
+(l-m)
+P_l^m(\cos\theta)
+=
+(2l-1)\cos\theta
+P_{l-1}^m(\cos\theta)
+-
+(l+m-1)
+P_{l-2}^m(\cos\theta)
+\]
+
+\[
+\frac{(l-m)r^l
+P_l^m e^{im\phi}}{(l+m)!}
+=
+\frac{r^l \cos\theta (2l-1) P_{l-1}^m e^{im\phi}}{(l+m)!}
+-
+\frac{r^l (l+m-1) P_{l-2}^me^{im\phi}}{(l+m)!}
+\]
+
+\[
+\frac{z (2l-1)}{(l+m)}
+\left[
+\frac{r^{l-1} P_{l-1}^m e^{im\phi}}{(l+m-1)!}
+\right]
+=
+\frac{(2l-1)z}{(l+m)} R_{l-1}^m
+\]
+
+\[
+\frac{r^2 (l+m-1)}{(l+m)(l+m-1)(l+m-2)!}
+\left[
+r^{l-2}
+P_{l-2}^m
+e^{im\phi}
+\right]
+=
+\frac{r^2}{(l+m)}
+R_{l-2}^m
+\]
+
+\[
+(l-m)
+R_l^m
+=
+\frac{(2l-1)z R_{l-1}^m - r^2 R_{l-2}^m}{(l+m)}
+\]
+
+\[
+R_l^m
+=
+\frac{(2l-1)z R_{l-1}^m - r^2 R_{l-2}^m}{(l-m)(l+m)}
+\]
+
+Now we have everything for building Multipole coefficients.

@@ -1,0 +1,136 @@
+\section{Fast Multipole Method using Spherical Harmonics}
+
+At this point, The Hierarchical tree is completed and the geometric information of every node has been determined. Now we calculate every nodes Multipole and local expansions like Particle-to-Multipole (P2M), Multipole-to-Multipole (M2M), Multipole-to-Local (M2L), Local-to-Local (L2L), Particle-to-Local(P2L), Multipole-to-Particle(M2P), and Local-to-Particle (L2P)
+
+\subsection{Particle-to-Multipole(P2M)}
+
+Basically we need to group particles information into once info. so we only consider leaf nodes, and represent all those particles inside a leaf node into one multipole expansion for those node.
+
+First let's look at what we have,
+\begin{itemize}
+    \item \textbf{Tree Info} - node\_start, node\_count, child\_idx
+    \item \textbf{Particle Info} - particle\_id, pos\_x, pos\_y, pos\_z, masses
+    \item \textbf{Node Info} - center\_x, center\_y, center\_z
+\end{itemize}
+
+we get an integer value \textbf{p} from the user, the expansion order, and we cap that at \textbf{10} for now. And in this expansion we only take non-negative m only because masses are real values. so in $M_{l}^{m}$ expansion we have maximum this much terms
+
+\[
+\texttt{num\_terms} = \frac{(p + 1)(p + 2)}{2}
+\]
+
+After calculation, We allocate two arrays to store Multipole expansion for real and imaginary, and it has \textbf{size = num\_terms * total\_nodes}, Now we execute kernel with grid that have toatl\_nodes times blocks containing 128 threads. so one node gets one block each, we get node\_idx less that total\_nodes and only leaf nodes
+\begin{lstlisting}[language=C]
+    if (child_idx[node_idx] != -1) return;
+\end{lstlisting}
+
+Then calculate the \textbf{tid}, initialize two real and imaginary arrays in shared memory of size \textbf{MAX\_TERMS} (\#define MAX\_TERMS 66), run a grid-stride loop through those arrays and make all values 0.0.
+
+Now before moving with code, Let's look at the Math!
+
+\subsection*{THE MATH!}
+
+In the FMM, instead of calculating the interaction between every pair of particles directly, we group nearby particles into tree nodes, That combined effect of particles can be represented as multipole expansion, In this implimentation we use spherical harmonics. why because for the usual Laplace kernel $\frac{1}{\left|\mathbf{r} - \mathbf{r}'\right|}$ you can write gravitational potential as
+
+\[
+\frac{1}{\left|\mathbf{r} - \mathbf{r}_{i}\right|}
+=
+\sum_{l=0}^{\infty}
+\sum_{m=-l}^{l}
+\frac{4\pi}{2l+1}
+\frac{\mathbf{r}_{i}^{l}}{\mathbf{r}^{l+1}}
+Y_{l}^{m}(\theta, \phi)
+Y_{l}^{m*}(\theta_{i}, \phi_{i})
+\]
+
+The standard spherical harmonics is defined as $Y_{l}^{m}(\theta, \phi) = N_{l}^{m}P_{l}^{m}(\cos\theta)e^{im\phi}$, where the normalization constant is
+
+\[
+N_{l}^{m}
+=
+\sqrt{\frac{2l+1}{4\pi}\frac{(l-m)!}{(l+m)!}}
+\]
+
+Therefore,
+
+\[
+Y_{l}^{m}(\theta, \phi)
+Y_{l}^{m*}(\theta_{i},\phi_{i})
+=
+(\frac{2l+1}{4\pi})
+\frac{(l-m)!}{(l+m)!}
+P_{l}^{m}(\cos\theta)
+P_{l}^{m}(\cos\theta_{i})
+e^{im(\phi - \phi_{i})}
+\]
+
+\[
+\frac{1}{\left|\mathbf{r} - \mathbf{r}_{i}\right|}
+=
+\sum_{l=0}^{\infty}
+\sum_{m=-l}^{l}
+\frac{(l-m)!}{(l+m)!}
+\frac{\mathbf{r}_{i}^{l}}{\mathbf{r}^{l+1}}
+P_{l}^{m}(\cos\theta)
+P_{l}^{m}(\cos\theta_{i})
+e^{im(\phi - \phi_{i})}
+\]
+
+To evaluate this efficiently in Fast Multipole Method, we split the remaining terms into two distinct functions: one for the source particle and one for the target evaluation.
+
+We assign the $\frac{1}{(l+m)!}$ and $\mathbf{r}_{i}^{l}$ to the source. This creates the \textbf{Regular Solid Harmonic}
+
+\[
+R_{l}^{m}(\mathbf{r}_{i})
+=
+\frac{1}{(l+m)!}
+\mathbf{r}_{i}^{l}
+P_{l}^{m}
+(\cos\theta_{i})
+e^{im\phi_{i}}
+\]
+
+We assign the $(l-m)!$ and $\frac{1}{\mathbf{r^{l+1}}}$ to the target. This creates the Irregular Solid Harmonic (which you use later in the M2L and local expansions):
+
+\[
+S_{l}^{m}(\mathbf{r})
+=
+(l-m)!
+\frac{1}{\mathbf{r^{l+1}}}
+P_{l}^{m}(\cos\theta_{i})
+e^{im\phi}
+\]
+
+By substituting $R_{l}^{m}$ and $S_{l}^{m}$ back into the kernel,
+
+\[
+\frac{1}{\left|\mathbf{r} - \mathbf{r}_{i}\right|}
+=
+\sum_{l=0}^{\infty}
+\sum_{m=-l}^{l}
+R_{l}^{m*}
+(\mathbf{r}_{i})
+S_{l}^{m}
+(\mathbf{r})
+\]
+
+Therefore, the total potential for a node containing N particles is:
+
+\[
+\Phi(\mathbf{r})
+=
+\sum_{l=0}^{p}
+\sum_{m=-l}^{l}
+\left(\sum_{i=1}^{N}q_{i}R_{l}^{m*}(\mathbf{r}_{i})\right)
+S_{l}^{m}(\mathbf{r})
+\]
+
+where,
+
+\[
+M_{l}^{m}
+=
+\sum_{i=1}^{N}q_{i}R_{l}^{m*}(\mathbf{r}_{i})
+\]
+
+So now we need to figure out how to find $R_{l}^{m}$.

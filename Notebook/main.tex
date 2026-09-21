@@ -1,0 +1,28 @@
+\documentclass[12pt]{article}
+
+\usepackage[a4paper, margin=1.5cm]{geometry}
+\usepackage{multicol}
+\usepackage{amsmath}
+\usepackage{listings}
+
+\lstset{
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,
+    breakatwhitespace=true,
+    columns=fullflexible
+}
+
+\setlength{\columnsep}{0.7cm}
+
+\begin{document}
+
+\begin{multicols}{2}
+
+\input{sections/01_linear_octree}
+\input{sections/02_mapping_tree_geometry}
+\input{sections/03_fmm_p2m_foundation}
+\input{sections/04_p2m_recurrence}
+
+\end{multicols}
+
+\end{document}

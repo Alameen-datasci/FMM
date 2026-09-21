@@ -1,0 +1,69 @@
+\section{Mapping Tree Geometry}
+
+After constructing the tree, we have the hierarchy and particle ranges, but we still need the physical geometry of each node. For each node, we store its center coordinates and half-width.
+
+We allocate four device arrays, one for each geometry value:
+
+\begin{itemize}
+    \item \textbf{d\_center\_x} - x-coordinate of the node center.
+    \item \textbf{d\_center\_y} - y-coordinate of the node center.
+    \item \textbf{d\_center\_z} - z-coordinate of the node center.
+    \item \textbf{d\_half\_width} - half-width of the node.
+\end{itemize}
+
+The root node geometry is copied to index 0. The remaining node geometry is then calculated level by level. We use the level-bounds information from the tree construction to know which nodes belong to each level.
+
+For every level, we launch the geometry CUDA kernel using 256 threads per block. The node index is calculated in the same way as in the tree-construction kernel. The root node is skipped because its geometry has already been set.
+
+For every other node, we first find its parent and then determine its octant:
+
+\begin{lstlisting}[language=C]
+int parent_idx = d_node_parent[idx];
+int first_child = d_child_idx[parent_idx];
+int octant = idx - first_child;
+\end{lstlisting}
+
+Since the 8 children of a parent are stored consecutively, subtracting \textbf{first\_child} from the current node index gives the octant number from 0 to 7.
+
+Because the geometry is calculated from the top of the tree downwards, the parent's geometry is already available when a child is processed. The child's half-width is half of the parent's half-width:
+
+\begin{lstlisting}[language=C]
+double child_half_width =
+    parent_half_width * 0.5;
+\end{lstlisting}
+
+The octant number is also used to determine the direction of the child from the parent center. Each bit of the octant corresponds to one coordinate direction:
+
+\begin{itemize}
+    \item bit 0 $\rightarrow$ x direction
+    \item bit 1 $\rightarrow$ y direction
+    \item bit 2 $\rightarrow$ z direction
+\end{itemize}
+
+We calculate the shifts using bitwise AND operations:
+
+\begin{lstlisting}[language=C]
+double shift_x =
+    (octant & 1) ? child_half_width
+                 : -child_half_width;
+
+double shift_y =
+    (octant & 2) ? child_half_width
+                 : -child_half_width;
+
+double shift_z =
+    (octant & 4) ? child_half_width
+                 : -child_half_width;
+\end{lstlisting}
+
+For example, if bit 0 is set, the child is placed on the positive x side of the parent. If it is not set, the child is placed on the negative x side. The same idea is used for the y and z directions.
+
+Finally, these shifts are added to the parent's center to obtain the child's center:
+
+\begin{lstlisting}[language=C]
+d_center_x[idx] = parent_cx + shift_x;
+d_center_y[idx] = parent_cy + shift_y;
+d_center_z[idx] = parent_cz + shift_z;
+\end{lstlisting}
+
+This gives every node a center and half-width that are consistent with its position in the octree. At this point, the tree structure and the geometry of all nodes are available for the FMM calculations.
