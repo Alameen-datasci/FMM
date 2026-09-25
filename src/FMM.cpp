@@ -41,6 +41,17 @@ FMM::~FMM() {
 
     freeDevice(d_morton);
     freeDevice(d_particle_id);
+
+    freeDevice(d_node_start);
+    freeDevice(d_node_count);
+    freeDevice(d_child_idx);
+    freeDevice(d_node_parent);
+    freeDevice(d_node_level);
+
+    freeDevice(d_center_x);
+    freeDevice(d_center_y);
+    freeDevice(d_center_z);
+    freeDevice(d_half_width);
 }
 
 void FMM::build(int p, int N_crit) {
@@ -62,11 +73,13 @@ void FMM::build(int p, int N_crit) {
         throw std::overflow_error("num_particles exeeds the current int-based tree limit.");
     }
 
-    // Allocating space for masses and positions in Device
+    // Allocating space for masses, positions, morton and particle id in Device
     if (!d_masses) CUDA_CHECK(cudaMalloc((void**)&d_masses, num_particles * sizeof(double)));
     if (!d_pos_x) CUDA_CHECK(cudaMalloc((void**)&d_pos_x, num_particles * sizeof(double)));
     if (!d_pos_y) CUDA_CHECK(cudaMalloc((void**)&d_pos_y, num_particles * sizeof(double)));
     if (!d_pos_z) CUDA_CHECK(cudaMalloc((void**)&d_pos_z, num_particles * sizeof(double)));
+    if (!d_morton) CUDA_CHECK(cudaMalloc((void**)&d_morton, num_particles * sizeof(uint64_t)));
+    if (!d_particle_id) CUDA_CHECK(cudaMalloc((void**)&d_particle_id, num_particles * sizeof(uint32_t)));
 
     // Copying data to Device
     CUDA_CHECK(cudaMemcpy(d_masses, masses, num_particles * sizeof(double), cudaMemcpyHostToDevice));
@@ -96,14 +109,6 @@ void FMM::build(int p, int N_crit) {
     ymin = root_cy - 0.5 * side;
     zmin = root_cz - 0.5 * side;
 
-    if (!d_morton) {
-        CUDA_CHECK(cudaMalloc((void**)&d_morton, num_particles * sizeof(uint64_t)));
-    }
-
-    if (!d_particle_id) {
-        CUDA_CHECK(cudaMalloc((void**)&d_particle_id, num_particles * sizeof(uint32_t)));
-    }
-
     // pass masses and positions to the gpu to do the work (morton generation)
     computeMortonCodesCUDA(
         d_pos_x, d_pos_y, d_pos_z,
@@ -113,4 +118,61 @@ void FMM::build(int p, int N_crit) {
         d_morton,
         d_particle_id
     );
+
+    // At this point we have our sorted morton array in GPU.
+    // Now we need to build the Octree.
+
+    // maximum possible internal nodes (nonleaf nodes)
+    const size_t max_internal_nodes_per_level = (num_particles + static_cast<size_t>(N_crit) - 1) / static_cast<size_t>(N_crit);
+    
+    const size_t capacity_factor = 8 * static_cast<size_t>(kMaxTreeDepth);
+
+    if (max_internal_nodes_per_level > (std::numeric_limits<size_t>::max() - 1) / capacity_factor) {
+        throw std::overflow_error("Tree capacity calculation overflowed.");
+    }
+
+    const size_t node_capacity_upper_bound = 1 + capacity_factor * max_internal_nodes_per_level;
+
+    if (node_capacity_upper_bound > static_cast<size_t>(std::numeric_limits<int>::max())) {
+        throw std::overflow_error("Tree capacity exceeds the current int-based node limit.");
+    }
+
+    if (node_capacity_upper_bound > node_capacity) {
+        freeDevice(d_node_start);
+        freeDevice(d_node_count);
+        freeDevice(d_child_idx);
+        freeDevice(d_node_parent);
+        freeDevice(d_node_level);
+        freeDevice(d_center_x);
+        freeDevice(d_center_y);
+        freeDevice(d_center_z);
+        freeDevice(d_half_width);
+
+        CUDA_CHECK(cudaMalloc((void**)&d_node_start, node_capacity_upper_bound * sizeof(int)));
+        CUDA_CHECK(cudaMalloc((void**)&d_node_count, node_capacity_upper_bound * sizeof(int)));
+        CUDA_CHECK(cudaMalloc((void**)&d_child_idx, node_capacity_upper_bound * sizeof(int)));
+        CUDA_CHECK(cudaMalloc((void**)&d_node_parent, node_capacity_upper_bound * sizeof(int)));
+        CUDA_CHECK(cudaMalloc((void**)&d_node_level, node_capacity_upper_bound * sizeof(int)));
+
+        CUDA_CHECK(cudaMalloc((void**)&d_center_x, node_capacity_upper_bound * sizeof(double)));
+        CUDA_CHECK(cudaMalloc((void**)&d_center_y, node_capacity_upper_bound * sizeof(double)));
+        CUDA_CHECK(cudaMalloc((void**)&d_center_z, node_capacity_upper_bound * sizeof(double)));
+        CUDA_CHECK(cudaMalloc((void**)&d_half_width, node_capacity_upper_bound * sizeof(double)));
+
+        node_capacity = node_capacity_upper_bound;
+    }
+
+    buildTreeCUDA(
+        d_morton,
+        num_particles,
+        N_crit,
+        d_node_start,
+        d_node_count,
+        d_child_idx,
+        d_node_parent,
+        &total_nodes,
+        level_bounds
+    );
+
+    CUDA_CHECK(cudaFree(d_morton));
 }
