@@ -3,144 +3,82 @@
 #include "FMM_CUDA.hpp"
 #include "cuda_utils.h"
 
-__device__ inline int find_lower_bound(
-    const uint64_t* morton,
-    int start, int end,
-    uint64_t target_prefix,
-    int shift_amount
-) {
-    int count = end - start;
-    while (count > 0) {
-        int step = count / 2;
-        int mid = start + step;
+#include <cub/block/block_scan.cuh>
 
-        uint64_t mid_prefix = morton[mid] >> shift_amount;
+namespace {
 
-        if (mid_prefix < target_prefix) {
-            start = mid + 1;
-            count -= step + 1;
-        } else {
-            count = step;
-        }
-    }
-    return start;
-}
+constexpr int kMortonBits = 63;
+constexpr int kOctantBits = 3;
+constexpr int kMaxTreeDepth = kMortonBits / kOctantBits;
+constexpr int kBlockSize = 256;
 
-__global__ void splitOctreeNodesKernel(
-    const uint64_t* __restrict__ morton,
+} // namespace
+
+__global__ void splitOctreeLevelKernel(
+    const uint64_t* __restrict__ d_morton,
     int* __restrict__ d_node_start,
     int* __restrict__ d_node_count,
     int* __restrict__ d_child_idx,
     int* __restrict__ d_node_parent,
     int* __restrict__ d_global_node_counter,
     int level_start_idx,
-    int num_nodes_in_level,
-    int current_level,
-    int N_crit
+    int nodes_in_level,
+    int depth, int N_crit
 ) {
-    int idx = level_start_idx + (blockIdx.x * blockDim.x + threadIdx.x);
-    if (idx >= level_start_idx + num_nodes_in_level) return;
+    using BlockScan = cub::BlockScan<int, kBlockSize>;
+    __shared__ typename BlockScan::TempStorage scan_storage;
+    __shared__ int block_child_base;
 
-    int parent_start = d_node_start[idx];
-    int parent_count = d_node_count[idx];
+    const int lane = threadIdx.x;
+    const int level_offset = blockIdx.x * blockDim.x + lane;
+    const bool valid = level_offset < nodes_in_level;
+    const int node = level_start_idx + level_offset;
 
-    if (parent_count <= N_crit) {
-        d_child_idx[idx] = -1;
-        return;
-    }
-
-    int first_child = atomicAdd(d_global_node_counter, 8);
-    d_child_idx[idx] = first_child;
-
-    int prefix_bits = (current_level + 1) * 3;
-    int shift_amount = 63 - prefix_bits;
-
-    uint64_t parent_prefix = morton[parent_start] >> (current_level * 3);
-    uint64_t child_base_prefix = parent_prefix << 3;
-
-    int current_start = parent_start;
-
-    for (int i = 0; i < 8; i++) {
-        int c_idx = first_child + i;
-        d_node_parent[c_idx] = idx;
-
-        int next_start;
-        if (i == 7) {
-            next_start = parent_start + parent_count;
-        } else {
-            uint64_t target_prefix = child_base_prefix | (i + 1);
-            next_start = find_lower_bound(morton, current_start, parent_start + parent_count, target_prefix, shift_amount);
-        }
-
-        d_node_start[c_idx] = current_start;
-        d_node_count[c_idx] = next_start - current_start;
-
-        current_start = next_start;
-    }
+    const int child_slots = valid && d_node_count[node] > N_crit ? 8 : 0;
+    int local_child_offset = 0;
+    int children_in_block = 0;
+    BlockScan(scan_storage).ExclusiveSum(child_slots, local_child_offset, children_in_block);
 }
 
 __host__ void buildTreeCUDA(
-    const uint64_t* morton,
+    const uint64_t* d_morton,
     size_t num_particles,
     int N_crit,
-    int* d_node_start, int* d_node_count, int* d_child_idx, int* d_node_parent,
+    int* d_node_start, int* d_node_count,
+    int* d_child_idx, int* d_node_parent,
     int* out_total_nodes,
     std::vector<int>& out_level_bounds
 ) {
-    int root_start = 0;
-    int root_count = static_cast<int>(num_particles);
-    int root_parent = -1;
+    const int root_start = 0;
+    const int root_count = static_cast<int>(num_particles);
+    const int root_parent = -1;
 
     CUDA_CHECK(cudaMemcpy(d_node_start, &root_start, sizeof(int), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_node_count, &root_count, sizeof(int), cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(d_node_parent, &root_parent, sizeof(int), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_root_parent, &root_parent, sizeof(int), cudaMemcpyHostToDevice));
+
+    int* d_global_node_count = nullptr;
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_global_node_count), sizeof(int)));
+    const int initial_node_count = 1;
+    CUDA_CHECK(cudaMemcpy(d_global_node_count, initial_node_count, sizeof(int), cudaMemcpyHostToDevice));
 
     int level_start_idx = 0;
-    int num_nodes_in_level = 1;
-    int current_level = 0;
-
-    int* d_global_node_counter;
-    CUDA_CHECK(cudaMalloc((void**)&d_global_node_counter, sizeof(int)));
-    int h_global_node_counter = 1;
-    CUDA_CHECK(cudaMemcpy(d_global_node_counter, &h_global_node_counter, sizeof(int), cudaMemcpyHostToDevice));
-
+    int nodes_in_level = 1;
+    int total_nodes = initial_node_count;
     out_level_bounds.clear();
     out_level_bounds.push_back(level_start_idx);
 
-    while (num_nodes_in_level > 0 && current_level < 21) {
-        dim3 block(256);
-        int num_blocks = (num_nodes_in_level + block.x - 1) / block.x;
-        dim3 grid(num_blocks);
-
-        splitOctreeNodesKernel<<<grid, block>>>(
-            morton,
+    for (int depth = 0; depht < kMaxTreeDepth && nodes_in_level > 0; ++depth) {
+        const int blocks = (nodes_in_level + kBlockSize - 1) / kBlockSize;
+        splitOctreeLevelKernel<<<blocks, kBlockSize>>>(
+            d_morton,
             d_node_start, d_node_count,
             d_child_idx, d_node_parent,
-            d_global_node_counter,
-            level_start_idx, num_nodes_in_level,
-            current_level,
-            N_crit
+            d_global_node_count, level_start,
+            nodes_in_level,
+            depth, N_crit
         );
 
         CUDA_CHECK(cudaGetLastError());
-        CUDA_CHECK(cudaDeviceSynchronize());
-
-        int new_total_nodes;
-        CUDA_CHECK(cudaMemcpy(&new_total_nodes, d_global_node_counter, sizeof(int), cudaMemcpyDeviceToHost));
-
-        level_start_idx += num_nodes_in_level;
-        num_nodes_in_level = new_total_nodes - level_start_idx;
-        current_level++;
-
-        if (num_nodes_in_level > 0) {
-            out_level_bounds.push_back(level_start_idx);
-        }
     }
-
-    out_level_bounds.push_back(level_start_idx + num_nodes_in_level);
-
-    if (out_total_nodes) {
-        CUDA_CHECK(cudaMemcpy(out_total_nodes, d_global_node_counter, sizeof(int), cudaMemcpyDeviceToHost));
-    }
-    CUDA_CHECK(cudaFree(d_global_node_counter));
 }

@@ -10,6 +10,11 @@
 #include "cuda_utils.h"
 
 
+namespace {
+    constexpr int kBlockSize = 256;
+
+} // namespace
+
 __device__ inline uint64_t BitExpansionDevice(uint32_t v) {
         uint64_t x = v & 0x1FFFFF;
         x = (x | (x << 32)) & 0x1F00000000FFFFULL;
@@ -61,11 +66,9 @@ __host__ void computeMortonCodesCUDA(
     size_t num_particles, uint64_t* d_morton,
     uint32_t* d_particle_id
 ) {
-    dim3 block(256);
-    int num_blocks = (num_particles + block.x - 1) / block.x;
-    dim3 grid(num_blocks);
+    const int blocks = static_cast<int>((num_particles + kBlockSize - 1) / kBlockSize);
 
-    generateMortonCodesKernel<<<grid, block>>>(
+    generateMortonCodesKernel<<<blocks, kBlockSize>>>(
         d_pos_x, d_pos_y, d_pos_z,
         xmin, ymin, zmin, side,
         resolution, num_particles,

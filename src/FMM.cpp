@@ -74,12 +74,12 @@ void FMM::build(int p, int N_crit) {
     }
 
     // Allocating space for masses, positions, morton and particle id in Device
-    if (!d_masses) CUDA_CHECK(cudaMalloc((void**)&d_masses, num_particles * sizeof(double)));
-    if (!d_pos_x) CUDA_CHECK(cudaMalloc((void**)&d_pos_x, num_particles * sizeof(double)));
-    if (!d_pos_y) CUDA_CHECK(cudaMalloc((void**)&d_pos_y, num_particles * sizeof(double)));
-    if (!d_pos_z) CUDA_CHECK(cudaMalloc((void**)&d_pos_z, num_particles * sizeof(double)));
-    if (!d_morton) CUDA_CHECK(cudaMalloc((void**)&d_morton, num_particles * sizeof(uint64_t)));
-    if (!d_particle_id) CUDA_CHECK(cudaMalloc((void**)&d_particle_id, num_particles * sizeof(uint32_t)));
+    if (!d_masses) CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_masses), num_particles * sizeof(double)));
+    if (!d_pos_x) CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_pos_x), num_particles * sizeof(double)));
+    if (!d_pos_y) CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_pos_y), num_particles * sizeof(double)));
+    if (!d_pos_z) CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_pos_z), num_particles * sizeof(double)));
+    if (!d_morton) CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_morton), num_particles * sizeof(uint64_t)));
+    if (!d_particle_id) CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_particle_id), num_particles * sizeof(uint32_t)));
 
     // Copying data to Device
     CUDA_CHECK(cudaMemcpy(d_masses, masses, num_particles * sizeof(double), cudaMemcpyHostToDevice));
@@ -148,16 +148,16 @@ void FMM::build(int p, int N_crit) {
         freeDevice(d_center_z);
         freeDevice(d_half_width);
 
-        CUDA_CHECK(cudaMalloc((void**)&d_node_start, node_capacity_upper_bound * sizeof(int)));
-        CUDA_CHECK(cudaMalloc((void**)&d_node_count, node_capacity_upper_bound * sizeof(int)));
-        CUDA_CHECK(cudaMalloc((void**)&d_child_idx, node_capacity_upper_bound * sizeof(int)));
-        CUDA_CHECK(cudaMalloc((void**)&d_node_parent, node_capacity_upper_bound * sizeof(int)));
-        CUDA_CHECK(cudaMalloc((void**)&d_node_level, node_capacity_upper_bound * sizeof(int)));
+        CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_node_start), node_capacity_upper_bound * sizeof(int)));
+        CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_node_count), node_capacity_upper_bound * sizeof(int)));
+        CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_child_idx), node_capacity_upper_bound * sizeof(int)));
+        CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_node_parent), node_capacity_upper_bound * sizeof(int)));
+        CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_node_level), node_capacity_upper_bound * sizeof(int)));
 
-        CUDA_CHECK(cudaMalloc((void**)&d_center_x, node_capacity_upper_bound * sizeof(double)));
-        CUDA_CHECK(cudaMalloc((void**)&d_center_y, node_capacity_upper_bound * sizeof(double)));
-        CUDA_CHECK(cudaMalloc((void**)&d_center_z, node_capacity_upper_bound * sizeof(double)));
-        CUDA_CHECK(cudaMalloc((void**)&d_half_width, node_capacity_upper_bound * sizeof(double)));
+        CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_center_x), node_capacity_upper_bound * sizeof(double)));
+        CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_center_y), node_capacity_upper_bound * sizeof(double)));
+        CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_center_z), node_capacity_upper_bound * sizeof(double)));
+        CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_half_width), node_capacity_upper_bound * sizeof(double)));
 
         node_capacity = node_capacity_upper_bound;
     }
