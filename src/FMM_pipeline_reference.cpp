@@ -73,7 +73,7 @@ void FMM::build(int p, int n_crit) {
         throw std::invalid_argument("Particle masses and positions are required.");
     }
 
-    if (p < 0 || p > kMaxExpansionOrder) {
+    if (p <= 0 || p > kMaxExpansionOrder) {
         throw std::invalid_argument("p must be between 0 and 10.");
     }
 
