@@ -27,24 +27,23 @@ __global__ void p2mKernel(
     double* __restrict__ d_M_real,
     double* __restrict__ d_M_imag
 ) {
-    const int node_idx = blockIdx.x;
+    const int node = blockIdx.x;
 
-    if (node_idx >= total_nodes) return;
+    if (node >= total_nodes) return;
 
     const int tid = threadIdx.x;
 
-    __shared__ double s_M_real[kMaxTerms];
-    __shared__ double s_M_imag[kMaxTerms];
+    __shared__ double accum_real[kMaxTerms];
+    __shared__ double accum_imag[kMaxTerms];
 
     for (int term = tid; term < num_terms; term += blockDim.x) {
-        s_M_real[term] = 0.0;
-        s_M_imag[term] = 0.0;
+        accum_real[term] = 0.0;
+        accum_imag[term] = 0.0;
     }
 
     __syncthreads();
-// ========================================================================================================================
 
-    if (child_idx[node] == -1) {
+    if (d_child_idx[node] == -1) {
         const int begin = d_node_start[node];
         const int count = d_node_count[node];
         const double cx = d_center_x[node];
@@ -90,7 +89,35 @@ __global__ void p2mKernel(
                     R_imag[current] = (scale * R_imag[previous_l] - r2 * R_imag[previous_l2]) / denom;
                 }
             }
+
+            const unsigned active = __activemask();
+            const int lane = threadIdx.x & (warpSize - 1);
+            const int active_lanes = __popc(active);
+            for (int term = 0; term < num_terms; term++) {
+                double real_sum = mass * R_real[term];
+                double imag_sum = mass * R_imag[term];
+                for (int offset = warpSize / 2; offset > 0; offset >>= 1) {
+                    const double real_other = __shfl_down_sync(active, real_sum, offset);
+                    const double imag_other = __shfl_down_sync(active, imag_sum, offset);
+                    if (lane + offset < active_lanes) {
+                        real_sum += real_other;
+                        imag_sum += imag_other;
+                    }
+                }
+
+                if (lane == 0) {
+                    atomicAdd(&accum_real[term], real_sum);
+                    atomicAdd(&accum_imag[term], imag_sum);
+                }
+            }
         }
+    }
+
+    __syncthreads();
+    const size_t node_offset = static_cast<size_t>(node) * num_terms;
+    for (int term = tid; term < num_terms; term += blockDim.x) {
+        d_M_real[node_offset + term] = accum_real[term];
+        d_M_imag[node_offset + term] = accum_imag[term];
     }
 }
 
@@ -146,12 +173,12 @@ __host__ void computeP2MCUDA(
     *d_M_imag = nullptr;
 
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(d_M_real), bytes));
-    const cudaError_t imag_alloc =
-        cudaMalloc(reinterpret_cast<void**>(d_M_imag), bytes);
-    if (imag_alloc != cudaSuccess) {
+
+    const cudaError_t err = cudaMalloc(reinterpret_cast<void**>(d_M_imag), bytes);
+    if (err != cudaSuccess) {
         cudaFree(*d_M_real);
         *d_M_real = nullptr;
-        CUDA_CHECK(imag_alloc);
+        CUDA_CHECK(err);
     }
 
     p2mKernel<<<total_nodes, kBlockSize>>>(
