@@ -175,4 +175,42 @@ void FMM::build(int p, int N_crit) {
     );
 
     CUDA_CHECK(cudaFree(d_morton));
+    freeDevice(d_morton);
+
+    mapTreeGeometryCUDA(
+        total_nodes,
+        level_bounds,
+        d_child_idx,
+        d_node_parent,
+        d_node_level,
+        d_center_x,
+        d_center_y,
+        d_center_z,
+        d_half_width,
+        root_cx,
+        root_cy,
+        root_cz,
+        0.5 * side
+    );
+
+    freeDevice(d_M_real);
+    freeDevice(d_M_imag);
+
+    computeP2MCUDA(
+        total_nodes,
+        p,
+        d_node_start,
+        d_node_count,
+        d_child_idx,
+        d_particle_id,
+        d_pos_x,
+        d_pos_y,
+        d_pos_z,
+        d_masses,
+        d_center_x,
+        d_center_y,
+        d_center_z,
+        &d_M_real,
+        &d_M_imag
+    );
 }

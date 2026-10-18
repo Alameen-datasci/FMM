@@ -95,7 +95,7 @@ __global__ void p2mKernel(
             const int active_lanes = __popc(active);
             for (int term = 0; term < num_terms; term++) {
                 double real_sum = mass * R_real[term];
-                double imag_sum = mass * R_imag[term];
+                double imag_sum = - mass * R_imag[term];
                 for (int offset = warpSize / 2; offset > 0; offset >>= 1) {
                     const double real_other = __shfl_down_sync(active, real_sum, offset);
                     const double imag_other = __shfl_down_sync(active, imag_sum, offset);

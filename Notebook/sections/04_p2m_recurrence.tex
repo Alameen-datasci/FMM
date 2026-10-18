@@ -1,11 +1,7 @@
 \[
-R_{l}^{m}(\mathbf{r}_{i})
-=
-\frac{1}{(l+m)!}
-\mathbf{r}_{i}^{l}
-P_{l}^{m}
-(\cos\theta_{i})
-e^{im\phi_{i}}
+R_l^m(\mathbf r_i)
+=\frac{r_i^l}{(l+m)!}
+P_l^m(\cos\theta_i)e^{im\phi_i}
 \]
 
 we already allocated space for real and imaginary arrays, so we fill them like this
@@ -21,45 +17,30 @@ we already allocated space for real and imaginary arrays, so we fill them like t
 For the diagonal terms, we use the standard property of Associated Legendre Polynomials
 
 \[
-P_{l}^{l}
-=-(2l-1)\sin\theta
-P_{l-1}^{l-1}(\cos\theta)
+P_l^l(\cos\theta)
+=-(2l-1)\sin\theta\,P_{l-1}^{l-1}(\cos\theta)
 \]
 
 \[
-R_{l}^{l}
-=
-\frac{1}{(2l)!}
-\mathbf{r}^{l}
-\left[
--(2l-1)\sin\theta
-P_{l-1}^{l-1}(\cos\theta)
-\right]
-e^{il\phi}
+\begin{aligned}
+R_l^l
+&=\frac{r^l}{(2l)!}
+\left[-(2l-1)\sin\theta\,P_{l-1}^{l-1}(\cos\theta)\right]\\
+&\qquad\times e^{il\phi}
+\end{aligned}
 \]
 
 \[
-R_{l}^{l}
-=
-\frac{-1}{2l}
-\mathbf{r}
-\sin\theta
-e^{i\phi}
-\left[
-\frac{1}{(2l-1)!}
-\mathbf{r}^{l-1}
-P_{l-1}^{l-1}
-(\cos\theta)
-e^{i(l-1)\phi}
-\right]
+\begin{aligned}
+R_l^l
+&=-\frac{r\sin\theta\,e^{i\phi}}{2l}\\
+&\qquad\times\left[\frac{r^{l-1}}{(2l-1)!}
+P_{l-1}^{l-1}(\cos\theta)e^{i(l-1)\phi}\right]
+\end{aligned}
 \]
 
 \[
-R_{l}^{l}
-=
-\frac{-1}{2l}
-(x+iy)
-R_{l-1}^{l-1}
+R_l^l=-\frac{x+iy}{2l}R_{l-1}^{l-1}
 \]
 
 \subsubsection*{The Off-Diagonal Terms (m = l - 1)}
@@ -67,103 +48,80 @@ R_{l-1}^{l-1}
 For the first sub-diagonal, the Legendre polynomial property is:
 
 \[
-P_{l}^{l-1}
-(\cos\theta)
-=
-\cos\theta
-(2l-1)
-P_{l-1}^{l-1}
-(\cos\theta)
+P_l^{l-1}(\cos\theta)
+=(2l-1)\cos\theta\,P_{l-1}^{l-1}(\cos\theta)
 \]
 
 \[
-R_{l}^{l-1}
-=
-\frac{1}{(2l-1)!}
-\mathbf{r}^{l}
-\left[
-\cos\theta
-(2l-1)
-P_{l-1}^{l-1}
-(\cos\theta)
-\right]
-e^{i(l-1)\phi}
+\begin{aligned}
+R_l^{l-1}
+&=\frac{r^l}{(2l-1)!}
+\left[(2l-1)\cos\theta\,P_{l-1}^{l-1}(\cos\theta)\right]\\
+&\qquad\times e^{i(l-1)\phi}
+\end{aligned}
 \]
 
 \[
-R_{l}^{l-1}
-=
-\mathbf{r}\cos\theta
-\left[
-\frac{1}{(2l-1)!}
-\mathbf{r}^{l-1}
-P_{l-1}^{l-1}
-(\cos\theta)
-e^{i(l-1)\phi}
-\right]
+\begin{aligned}
+R_l^{l-1}
+&=r\cos\theta\\
+&\qquad\times\left[\frac{r^{l-1}}{(2l-1)!}
+P_{l-1}^{l-1}(\cos\theta)e^{i(l-1)\phi}\right]
+\end{aligned}
 \]
 
 \[
-R_{l}^{l-1}
-=zR_{l-1}^{l-1}
+R_l^{l-1}=zR_{l-1}^{l-1}
 \]
 
-\subsubsection{The General Terms (0 $\leq$ m $\leq$ l - 1)}
+\subsubsection{The General Terms (0 $\leq$ m $\leq$ l - 2)}
 
 For all remaining terms, we rely on Bonnet's recursion formula for Associated Legendre Polynomials:
 
 \[
-(l-m)
-P_l^m(\cos\theta)
-=
-(2l-1)\cos\theta
-P_{l-1}^m(\cos\theta)
--
-(l+m-1)
-P_{l-2}^m(\cos\theta)
+\begin{aligned}
+(l-m)P_l^m(\cos\theta)
+&=(2l-1)\cos\theta\,P_{l-1}^m(\cos\theta)\\
+&\qquad-(l+m-1)P_{l-2}^m(\cos\theta)
+\end{aligned}
 \]
 
 \[
-\frac{(l-m)r^l
-P_l^m e^{im\phi}}{(l+m)!}
-=
-\frac{r^l \cos\theta (2l-1) P_{l-1}^m e^{im\phi}}{(l+m)!}
--
-\frac{r^l (l+m-1) P_{l-2}^me^{im\phi}}{(l+m)!}
+\begin{aligned}
+\frac{(l-m)r^lP_l^m e^{im\phi}}{(l+m)!}
+&=\frac{(2l-1)zr^{l-1}P_{l-1}^m e^{im\phi}}{(l+m)!}\\
+&\qquad-\frac{(l+m-1)r^lP_{l-2}^m e^{im\phi}}{(l+m)!}
+\end{aligned}
 \]
 
 \[
-\frac{z (2l-1)}{(l+m)}
-\left[
-\frac{r^{l-1} P_{l-1}^m e^{im\phi}}{(l+m-1)!}
-\right]
-=
-\frac{(2l-1)z}{(l+m)} R_{l-1}^m
+\begin{aligned}
+\frac{(2l-1)z}{l+m}
+&\left[\frac{r^{l-1}P_{l-1}^m e^{im\phi}}{(l+m-1)!}\right]\\
+&=\frac{(2l-1)z}{l+m}R_{l-1}^m
+\end{aligned}
 \]
 
 \[
-\frac{r^2 (l+m-1)}{(l+m)(l+m-1)(l+m-2)!}
-\left[
-r^{l-2}
-P_{l-2}^m
-e^{im\phi}
-\right]
-=
-\frac{r^2}{(l+m)}
-R_{l-2}^m
+\begin{aligned}
+\frac{r^2(l+m-1)}{(l+m)(l+m-1)(l+m-2)!}
+&\left[r^{l-2}P_{l-2}^m e^{im\phi}\right]\\
+&=\frac{r^2}{l+m}R_{l-2}^m
+\end{aligned}
 \]
 
 \[
-(l-m)
+\begin{aligned}
+(l-m)R_l^m
+&=\frac{(2l-1)zR_{l-1}^m-r^2R_{l-2}^m}{l+m}
+\end{aligned}
+\]
+
+\[
+\begin{aligned}
 R_l^m
-=
-\frac{(2l-1)z R_{l-1}^m - r^2 R_{l-2}^m}{(l+m)}
-\]
-
-\[
-R_l^m
-=
-\frac{(2l-1)z R_{l-1}^m - r^2 R_{l-2}^m}{(l-m)(l+m)}
+&=\frac{(2l-1)zR_{l-1}^m-r^2R_{l-2}^m}{(l-m)(l+m)}
+\end{aligned}
 \]
 
 Now we have everything for building Multipole coefficients.

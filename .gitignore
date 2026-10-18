@@ -3,3 +3,51 @@
 .AppleDouble
 .LSOverride
 ._*
+
+# CMake and common build directories
+/build/
+/cmake-build-*/
+/CMakeFiles/
+/CMakeCache.txt
+/Testing/
+/bin/
+/lib/
+
+# C/C++ build artifacts
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+*.d
+*.pch
+*.gch
+
+# CUDA build artifacts
+*.cubin
+*.fatbin
+*.ptx
+*.compute_*
+
+# LaTeX auxiliary files
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.lot
+*.log
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+
+# Editor and temporary files
+*.swp
+*.swo
+*~
