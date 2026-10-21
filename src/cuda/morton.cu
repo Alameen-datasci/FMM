@@ -1,7 +1,9 @@
 #include <cuda_runtime.h>
 #include <cstdint>
 #include <cstddef>
-#include <iostream>
+#include <cmath>
+#include <limits>
+#include <stdexcept>
 
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
@@ -66,7 +68,30 @@ __host__ void computeMortonCodesCUDA(
     size_t num_particles, uint64_t* d_morton,
     uint32_t* d_particle_id
 ) {
-    const int blocks = static_cast<int>((num_particles + kBlockSize - 1) / kBlockSize);
+    if (num_particles == 0) return;
+    if (num_particles >
+        static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+        throw std::overflow_error(
+            "num_particles exceeds the current int-based particle index limit.");
+    }
+    if (d_pos_x == nullptr || d_pos_y == nullptr || d_pos_z == nullptr ||
+        d_morton == nullptr || d_particle_id == nullptr) {
+        throw std::invalid_argument("Morton device pointers must be non-null.");
+    }
+    constexpr uint32_t kMaxCoordinateResolution = 1u << 21;
+    if (resolution == 0 || resolution > kMaxCoordinateResolution) {
+        throw std::invalid_argument(
+            "resolution must be between 1 and 2^21 for 21-bit Morton coordinates.");
+    }
+    if (!std::isfinite(xmin) || !std::isfinite(ymin) ||
+        !std::isfinite(zmin) || !std::isfinite(side) || side < 0.0) {
+        throw std::invalid_argument(
+            "Morton bounds must be finite and side must be non-negative.");
+    }
+
+    const std::size_t block_count =
+        1 + (num_particles - 1) / static_cast<std::size_t>(kBlockSize);
+    const int blocks = static_cast<int>(block_count);
 
     generateMortonCodesKernel<<<blocks, kBlockSize>>>(
         d_pos_x, d_pos_y, d_pos_z,

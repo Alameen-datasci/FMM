@@ -1,6 +1,9 @@
 #include <cuda_runtime.h>
 
+#include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <stdexcept>
 #include <vector>
 
 #include "FMM_CUDA.hpp"
@@ -51,8 +54,8 @@ __global__ void splitOctreeLevelKernel(
     __shared__ typename BlockScan::TempStorage scan_storage;
     __shared__ int block_child_base;
     
-    const int lane = threadIdx.x;
-    const int level_offset = blockIdx.x * blockDim.x + lane;
+    const int lane = static_cast<int>(threadIdx.x);
+    const int level_offset = static_cast<int>(blockIdx.x) * static_cast<int>(blockDim.x) + lane;
     const bool valid = level_offset < nodes_in_level;
     const int node = level_start_idx + level_offset;
     
@@ -107,6 +110,22 @@ __host__ void buildTreeCUDA(
     int* out_total_nodes,
     std::vector<int>& out_level_bounds
 ) {
+    if (num_particles == 0) {
+        throw std::invalid_argument("num_particles must be positive.");
+    }
+    if (num_particles > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+        throw std::overflow_error(
+            "num_particles exceeds the current int-based tree index limit.");
+    }
+    if (N_crit <= 0) {
+        throw std::invalid_argument("N_crit must be positive.");
+    }
+    if (d_morton == nullptr || d_node_start == nullptr ||
+        d_node_count == nullptr || d_child_idx == nullptr ||
+        d_node_parent == nullptr) {
+        throw std::invalid_argument("Octree device input/output pointers must be non-null.");
+    }
+
     const int root_start = 0;
     const int root_count = static_cast<int>(num_particles);
     const int root_parent = -1;
@@ -127,7 +146,7 @@ __host__ void buildTreeCUDA(
     out_level_bounds.push_back(level_start);
 
     for (int depth = 0; depth < kMaxTreeDepth && nodes_in_level > 0; ++depth) {
-        const int blocks = (nodes_in_level + kBlockSize - 1) / kBlockSize;
+        const int blocks = 1 + (nodes_in_level - 1) / kBlockSize;
         splitOctreeLevelKernel<<<blocks, kBlockSize>>>(
             d_morton,
             d_node_start, d_node_count,

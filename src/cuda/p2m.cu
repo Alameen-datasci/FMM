@@ -27,16 +27,16 @@ __global__ void p2mKernel(
     double* __restrict__ d_M_real,
     double* __restrict__ d_M_imag
 ) {
-    const int node = blockIdx.x;
+    const int node = static_cast<int>(blockIdx.x);
 
     if (node >= total_nodes) return;
 
-    const int tid = threadIdx.x;
+    const int tid = static_cast<int>(threadIdx.x);
 
     __shared__ double accum_real[kMaxTerms];
     __shared__ double accum_imag[kMaxTerms];
 
-    for (int term = tid; term < num_terms; term += blockDim.x) {
+    for (int term = tid; term < num_terms; term += static_cast<int>(blockDim.x)) {
         accum_real[term] = 0.0;
         accum_imag[term] = 0.0;
     }
@@ -50,7 +50,7 @@ __global__ void p2mKernel(
         const double cy = d_center_y[node];
         const double cz = d_center_z[node];
 
-        for (int particle = tid; particle < count; particle += blockDim.x) {
+        for (int particle = tid; particle < count; particle += static_cast<int>(blockDim.x)) {
             const uint32_t pid = d_particle_id[begin + particle];
             const double dx = d_pos_x[pid] - cx;
             const double dy = d_pos_y[pid] - cy;
@@ -91,7 +91,7 @@ __global__ void p2mKernel(
             }
 
             const unsigned active = __activemask();
-            const int lane = threadIdx.x & (warpSize - 1);
+            const int lane = static_cast<int>(threadIdx.x) & (warpSize - 1);
             const int active_lanes = __popc(active);
             for (int term = 0; term < num_terms; term++) {
                 double real_sum = mass * R_real[term];
@@ -115,7 +115,7 @@ __global__ void p2mKernel(
 
     __syncthreads();
     const size_t node_offset = static_cast<size_t>(node) * num_terms;
-    for (int term = tid; term < num_terms; term += blockDim.x) {
+    for (int term = tid; term < num_terms; term += static_cast<int>(blockDim.x)) {
         d_M_real[node_offset + term] = accum_real[term];
         d_M_imag[node_offset + term] = accum_imag[term];
     }

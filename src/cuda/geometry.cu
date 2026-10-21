@@ -1,6 +1,9 @@
 #include <cuda_runtime.h>
 
-#include<stdexcept>
+#include <cmath>
+#include <cstddef>
+#include <limits>
+#include <stdexcept>
 #include <vector>
 
 #include "FMM_CUDA.hpp"
@@ -23,10 +26,11 @@ __global__ void computeNodeGeometryKernel(
     int num_nodes_in_level,
     int current_level
 ) {
-    const int local_idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (local_idx >= num_nodes_in_level) return;
+    const std::size_t local_idx =
+        static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (local_idx >= static_cast<std::size_t>(num_nodes_in_level)) return;
 
-    const int node = level_start_idx + local_idx;
+    const int node = level_start_idx + static_cast<int>(local_idx);
     d_node_level[node] = current_level;
 
     if (current_level == 0) return;
@@ -61,14 +65,33 @@ __host__ void mapTreeGeometryCUDA(
     double root_cy, double root_cz,
     double root_half_width
 ) {
-    if (total_nodes <= 0) return;
+    if (total_nodes < 0) {
+        throw std::invalid_argument("total_nodes must be non-negative.");
+    }
+    if (total_nodes == 0) return;
+
     if (
         level_bounds.size() < 2 ||
+        level_bounds.size() - 1 >
+            static_cast<std::size_t>(std::numeric_limits<int>::max()) ||
         level_bounds.front() != 0 ||
         level_bounds.back() != total_nodes
     ) throw std::invalid_argument("Invalid level bounds for tree geometry.");
 
-    for (size_t i = 1; i < level_bounds.size(); i++) {
+    if (d_child_idx == nullptr || d_node_parent == nullptr ||
+        d_node_level == nullptr || d_center_x == nullptr ||
+        d_center_y == nullptr || d_center_z == nullptr ||
+        d_half_width == nullptr) {
+        throw std::invalid_argument("Tree geometry device pointers must be non-null.");
+    }
+    if (!std::isfinite(root_cx) || !std::isfinite(root_cy) ||
+        !std::isfinite(root_cz) || !std::isfinite(root_half_width) ||
+        root_half_width < 0.0) {
+        throw std::invalid_argument(
+            "Root center must be finite and root_half_width must be finite and non-negative.");
+    }
+
+    for (std::size_t i = 1; i < level_bounds.size(); i++) {
         if (level_bounds[i] < level_bounds[i - 1]) {
             throw std::invalid_argument("Tree level bounds must be nondecreasing.");
         }
@@ -79,7 +102,7 @@ __host__ void mapTreeGeometryCUDA(
     CUDA_CHECK(cudaMemcpy(d_center_z, &root_cz, sizeof(double), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_half_width, &root_half_width, sizeof(double), cudaMemcpyHostToDevice));
 
-    const int num_levels = static_cast<int>(level_bounds.size()) - 1;
+    const int num_levels = static_cast<int>(level_bounds.size() - 1);
 
     for (int level = 0; level < num_levels; level++) {
         const int begin = level_bounds[level];
@@ -87,7 +110,7 @@ __host__ void mapTreeGeometryCUDA(
 
         if (count == 0) continue;
 
-        const int blocks = (count + kBlockSize - 1) / kBlockSize;
+        const int blocks = 1 + (count - 1) / kBlockSize;
         computeNodeGeometryKernel<<<blocks, kBlockSize>>>(
             d_node_parent, d_child_idx,
             d_center_x, d_center_y,
