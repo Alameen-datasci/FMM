@@ -38,7 +38,7 @@ The child nodes need to be given unique positions in the global node arrays. Sin
 int first_child = atomicAdd(d_global_node_counter, 8);
 \end{lstlisting}
 
-This gives each parent a separate group of 8 continuous indices. The value returned by \textbf{atomicAdd} is used as the first child index.
+This gives each parent a separate group of 8 consecutive indices. The value returned by \textbf{atomicAdd} is used as the first child index.
 
 \subsection{Handling the Morton Codes}
 
@@ -84,7 +84,7 @@ if (i == 7) {
 }
 \end{lstlisting}
 
-The \textbf{find\_lower\_bound()} function uses a binary search on the sorted Morton codes. It finds the position where the next child prefix starts. This gives us the boundary between two child particle ranges.
+The \textbf{find\_lower\_bound()} function uses a binary search on the sorted Morton codes. It finds the position where the next child prefix starts. This gives us the boundary between consecutive child particle ranges.
 
 After finding the boundary, we store the starting position and particle count of the child:
 

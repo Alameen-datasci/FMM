@@ -1,36 +1,36 @@
 \section{Fast Multipole Method using Spherical Harmonics}
 
-At this point, The Hierarchical tree is completed and the geometric information of every node has been determined. Now we calculate every nodes Multipole and local expansions like Particle-to-Multipole (P2M), Multipole-to-Multipole (M2M), Multipole-to-Local (M2L), Local-to-Local (L2L), Particle-to-Local(P2L), Multipole-to-Particle(M2P), and Local-to-Particle (L2P)
+At this point, the hierarchical tree is complete, and the geometric information for every node has been determined. Next, we calculate the multipole and local expansions using the following FMM stages: Particle-to-Multipole (P2M), Multipole-to-Multipole (M2M), Multipole-to-Local (M2L), Local-to-Local (L2L), Particle-to-Local (P2L), Multipole-to-Particle (M2P), and Local-to-Particle (L2P).
 
-\subsection{Particle-to-Multipole(P2M)}
+\subsection{Particle-to-Multipole (P2M)}
 
-Basically we need to group particles information into once info. so we only consider leaf nodes, and represent all those particles inside a leaf node into one multipole expansion for those node.
+We group particle information into a single representation. For P2M, we consider only leaf nodes and represent the particles in each leaf with one multipole expansion.
 
-First let's look at what we have,
+First, let's look at the data we have:
 \begin{itemize}
     \item \textbf{Tree Info} - node\_start, node\_count, child\_idx
     \item \textbf{Particle Info} - particle\_id, pos\_x, pos\_y, pos\_z, masses
     \item \textbf{Node Info} - center\_x, center\_y, center\_z
 \end{itemize}
 
-we get an integer value \textbf{p} from the user, the expansion order, and we cap that at \textbf{10} for now. And in this expansion we only take non-negative m only because masses are real values. so in $M_{l}^{m}$ expansion we have maximum this much terms
+We get an integer value \textbf{p} from the user as the expansion order, and cap it at \textbf{10} for now. We store only non-negative values of \(m\), since the masses are real. The number of terms in the \(M_l^m\) expansion is
 
 \[
 \texttt{num\_terms} = \frac{(p + 1)(p + 2)}{2}
 \]
 
-After calculation, We allocate two arrays to store Multipole expansion for real and imaginary, and it has \textbf{size = num\_terms * total\_nodes}, Now we execute kernel with grid that have toatl\_nodes times blocks containing 128 threads. so one node gets one block each, we get node\_idx less that total\_nodes and only leaf nodes
+After calculating \texttt{num\_terms}, we allocate two arrays for the real and imaginary parts of the multipole expansion. Each array has \textbf{num\_terms * total\_nodes} elements. We launch one block per node, with 128 threads per block. Each block handles one node; only leaf nodes continue to the particle calculations:
 \begin{lstlisting}[language=C]
     if (child_idx[node_idx] != -1) return;
 \end{lstlisting}
 
-Then calculate the \textbf{tid}, initialize two real and imaginary arrays in shared memory of size \textbf{MAX\_TERMS} (\#define MAX\_TERMS 66), run a grid-stride loop through those arrays and make all values 0.0.
+We then calculate \textbf{tid} and initialize the real and imaginary shared-memory arrays, each with \textbf{MAX\_TERMS} elements (\#define MAX\_TERMS 66). A grid-stride loop sets every value to 0.0.
 
-Now before moving with code, Let's look at the Math!
+Before moving on to the code, let's look at the math.
 
 \subsection*{THE MATH!}
 
-In the FMM, instead of calculating the interaction between every pair of particles directly, we group nearby particles into tree nodes, That combined effect of particles can be represented as multipole expansion, In this implimentation we use spherical harmonics. why because for the usual Laplace kernel $\frac{1}{\left|\mathbf{r} - \mathbf{r}'\right|}$ you can write gravitational potential as
+In the FMM, instead of calculating the interaction between every pair of particles directly, we group nearby particles into tree nodes. The combined effect of the particles can be represented by a multipole expansion. In this implementation, we use spherical harmonics because the gravitational potential for the usual Laplace kernel $\frac{1}{\left|\mathbf{r} - \mathbf{r}'\right|}$ can be written as
 
 \[
 \begin{aligned}
@@ -42,7 +42,7 @@ Y_{l}^{m*}(\theta_{i}, \phi_{i}),\qquad r_i<r
 \end{aligned}
 \]
 
-The standard spherical harmonics is defined as $Y_{l}^{m}(\theta, \phi) = N_{l}^{m}P_{l}^{m}(\cos\theta)e^{im\phi}$, where the normalization constant is
+The standard spherical harmonics are defined as $Y_{l}^{m}(\theta, \phi) = N_{l}^{m}P_{l}^{m}(\cos\theta)e^{im\phi}$, where the normalization constant is
 
 \[
 N_{l}^{m}
@@ -71,7 +71,7 @@ e^{im(\phi-\phi_i)}
 \end{aligned}
 \]
 
-To evaluate this efficiently in Fast Multipole Method, we split the remaining terms into two distinct functions: one for the source particle and one for the target evaluation.
+To evaluate this efficiently in the Fast Multipole Method, we split the remaining terms into two distinct functions: one for the source particle and one for the target evaluation.
 
 We assign the $\frac{1}{(l+m)!}$ and $\mathbf{r}_{i}^{l}$ to the source. This creates the \textbf{Regular Solid Harmonic}
 
@@ -83,7 +83,7 @@ R_l^m(\mathbf r_i)
 \end{aligned}
 \]
 
-We assign the $(l-m)!$ and $\frac{1}{\mathbf{r^{l+1}}}$ to the target. This creates the Irregular Solid Harmonic (which you use later in the M2L and local expansions):
+We assign $(l-m)!$ and $\frac{1}{r^{l+1}}$ to the target. This creates the Irregular Solid Harmonic (which you use later in the M2L and local expansions):
 
 \[
 \begin{aligned}
@@ -103,7 +103,7 @@ R_l^{m*}(\mathbf r_i)S_l^m(\mathbf r)
 \end{aligned}
 \]
 
-Therefore, the total potential for a node containing N particles is:
+Therefore, the total potential for a node containing \(N\) particles is:
 
 \[
 \begin{aligned}
@@ -131,4 +131,4 @@ M_l^mS_l^m(\mathbf r)\right)\Bigg]
 \end{aligned}
 \]
 
-So now we need to figure out how to find $R_{l}^{m}$.
+Now we need to determine how to compute \(R_l^m\).

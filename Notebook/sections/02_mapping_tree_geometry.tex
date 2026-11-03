@@ -1,4 +1,4 @@
-\section{Mapping Tree Geometry}
+\section{Mapping Node Geometry}
 
 After constructing the tree, we have the hierarchy and particle ranges, but we still need the physical geometry of each node. For each node, we store its center coordinates and half-width.
 
@@ -15,7 +15,7 @@ The root node geometry is copied to index 0. The remaining node geometry is then
 
 For every level, we launch the geometry CUDA kernel using 256 threads per block. The node index is calculated in the same way as in the tree-construction kernel. The root node is skipped because its geometry has already been set.
 
-For every other node, we first find its parent and then determine its octant:
+For each remaining node, we first find its parent and then determine its octant:
 
 \begin{lstlisting}[language=C]
 int parent_idx = d_node_parent[idx];

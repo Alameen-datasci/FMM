@@ -4,7 +4,7 @@ R_l^m(\mathbf r_i)
 P_l^m(\cos\theta_i)e^{im\phi_i}
 \]
 
-we already allocated space for real and imaginary arrays, so we fill them like this
+We have already allocated space for the real and imaginary arrays, so we fill them as follows:
 
 \begin{itemize}
     \item Diagonal terms
@@ -14,7 +14,7 @@ we already allocated space for real and imaginary arrays, so we fill them like t
 
 \subsubsection*{The Diagonal Terms (m = l)}
 
-For the diagonal terms, we use the standard property of Associated Legendre Polynomials
+For the diagonal terms, we use the standard property of the associated Legendre polynomials:
 
 \[
 P_l^l(\cos\theta)
@@ -76,7 +76,7 @@ R_l^{l-1}=zR_{l-1}^{l-1}
 
 \subsubsection{The General Terms (0 $\leq$ m $\leq$ l - 2)}
 
-For all remaining terms, we rely on Bonnet's recursion formula for Associated Legendre Polynomials:
+For all remaining terms, we use Bonnet's recursion formula for the associated Legendre polynomials:
 
 \[
 \begin{aligned}
@@ -124,4 +124,17 @@ R_l^m
 \end{aligned}
 \]
 
-Now we have everything for building Multipole coefficients.
+We now have everything needed to build the multipole coefficients.
+
+\subsubsection{Multipole expansion for leaf nodes}
+Once \(R_\ell^m\) is computed for each particle relative to the leaf’s center, the leaf’s multipole coefficient is obtained by weighting each value by that particle’s mass and summing over all particles.
+
+\[
+M_{l}^{m}
+=
+\sum_{i=1}^{N}
+m_{i}
+R_{l}^{m*}
+\]
+
+We now have the multipole expansions for the leaf nodes. Next, we perform the upward pass to find the expansions for the internal nodes. This step is called \textbf{Multipole-to-Multipole (M2M)}.
