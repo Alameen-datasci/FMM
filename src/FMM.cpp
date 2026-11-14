@@ -1,6 +1,7 @@
 #include <cuda_runtime.h>
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <stdexcept>
 
@@ -10,7 +11,7 @@
 
 namespace {
 
-constexpr int kMaxExpansionOrder = 10;
+constexpr int kMaxExpansionOrder = FMM::max_expansion_order;
 constexpr int kMaxTreeDepth = 21;
 
 template <typename T>
@@ -24,11 +25,11 @@ void freeDevice(T*& pointer) {
 } // namespace
 
 FMM::FMM(
-    size_t num_particles_, double* masses_,
-    double* pos_x_, double* pos_y_, double* pos_z_,
-    double* vel_x_, double* vel_y_, double* vel_z_,
+    std::size_t num_particles_, const double* masses_,
+    const double* pos_x_, const double* pos_y_, const double* pos_z_,
+    const double* vel_x_, const double* vel_y_, const double* vel_z_,
     double* acc_x_, double* acc_y_, double* acc_z_
-    ) : num_particles(num_particles_), masses(masses_),
+) : num_particles(num_particles_), masses(masses_),
     pos_x(pos_x_), pos_y(pos_y_), pos_z(pos_z_),
     vel_x(vel_x_), vel_y(vel_y_), vel_z(vel_z_),
     acc_x(acc_x_), acc_y(acc_y_), acc_z(acc_z_) {}
@@ -52,6 +53,8 @@ FMM::~FMM() {
     freeDevice(d_center_y);
     freeDevice(d_center_z);
     freeDevice(d_half_width);
+    freeDevice(d_M_real);
+    freeDevice(d_M_imag);
 }
 
 void FMM::build(int p, int N_crit) {
@@ -70,7 +73,13 @@ void FMM::build(int p, int N_crit) {
     }
 
     if (num_particles > static_cast<size_t>(std::numeric_limits<int>::max())) {
-        throw std::overflow_error("num_particles exeeds the current int-based tree limit.");
+        throw std::overflow_error("num_particles exceeds the current int-based tree limit.");
+    }
+    for (std::size_t i = 0; i < num_particles; ++i) {
+        if (!std::isfinite(masses[i]) || !std::isfinite(pos_x[i]) ||
+            !std::isfinite(pos_y[i]) || !std::isfinite(pos_z[i])) {
+            throw std::invalid_argument("Particle masses and positions must be finite.");
+        }
     }
 
     // Allocating space for masses, positions, morton and particle id in Device
@@ -113,7 +122,7 @@ void FMM::build(int p, int N_crit) {
     computeMortonCodesCUDA(
         d_pos_x, d_pos_y, d_pos_z,
         xmin, ymin, zmin,
-        side, resolution,
+        side, morton_resolution,
         num_particles,
         d_morton,
         d_particle_id
@@ -212,5 +221,17 @@ void FMM::build(int p, int N_crit) {
         d_center_z,
         &d_M_real,
         &d_M_imag
+    );
+
+    computeM2MCUDA(
+        total_nodes,
+        p,
+        level_bounds,
+        d_child_idx,
+        d_center_x,
+        d_center_y,
+        d_center_z,
+        d_M_real,
+        d_M_imag
     );
 }
