@@ -1,0 +1,64 @@
+{
+  "version": 5,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default (Release)",
+      "description": "Configure an optimized CUDA build with tests disabled.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "FMM_BUILD_TESTING": "OFF"
+      }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "description": "Configure a debug CUDA build with tests disabled.",
+      "inherits": "default",
+      "binaryDir": "${sourceDir}/build/debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "testing",
+      "displayName": "Testing",
+      "description": "Configure a debug build with GoogleTest-based tests enabled.",
+      "inherits": "debug",
+      "binaryDir": "${sourceDir}/build/testing",
+      "cacheVariables": {
+        "FMM_BUILD_TESTING": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default"
+    },
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "testing",
+      "configurePreset": "testing"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "testing",
+      "configurePreset": "testing",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}
