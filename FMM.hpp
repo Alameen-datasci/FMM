@@ -72,4 +72,4 @@ private:
     std::size_t node_capacity = 0;
     int total_nodes = 0;
     std::vector<int> level_bounds;
-}
+};

@@ -174,11 +174,11 @@ __host__ void computeP2MCUDA(
 
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(d_M_real), bytes));
 
-    const cudaError_t err = cudaMalloc(reinterpret_cast<void**>(d_M_imag), bytes);
-    if (err != cudaSuccess) {
+    const cudaError_t allocation_error = cudaMalloc(reinterpret_cast<void**>(d_M_imag), bytes);
+    if (allocation_error != cudaSuccess) {
         cudaFree(*d_M_real);
         *d_M_real = nullptr;
-        CUDA_CHECK(err);
+        CUDA_CHECK(allocation_error);
     }
 
     p2mKernel<<<total_nodes, kBlockSize>>>(
