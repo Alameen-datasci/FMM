@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <cuda_runtime.h>
 #include <stdexcept>
+#include <cstdint>
 #include <limits>
 #include "FMM_CUDA.hpp"
 
@@ -14,11 +15,11 @@ protected:
     std::uint32_t* d_particle_id = nullptr;
 
     void SetUp() override {
-        ASSERT_EQ(cudaMalloc(reinterpret_cast<void**>(&d_pos_x), sizeof(double)), cudaSuccess);
-        ASSERT_EQ(cudaMalloc(reinterpret_cast<void**>(&d_pos_y), sizeof(double)), cudaSuccess);
-        ASSERT_EQ(cudaMalloc(reinterpret_cast<void**>(&d_pos_z), sizeof(double)), cudaSuccess);
-        ASSERT_EQ(cudaMalloc(reinterpret_cast<void**>(&d_morton), sizeof(std::uint64_t)), cudaSuccess);
-        ASSERT_EQ(cudaMalloc(reinterpret_cast<void**>(&d_particle_id), sizeof(std::uint32_t)), cudaSuccess);
+        ASSERT_EQ(cudaMalloc(reinterpret_cast<void**>(&d_pos_x), 25 * sizeof(double)), cudaSuccess);
+        ASSERT_EQ(cudaMalloc(reinterpret_cast<void**>(&d_pos_y), 25 * sizeof(double)), cudaSuccess);
+        ASSERT_EQ(cudaMalloc(reinterpret_cast<void**>(&d_pos_z), 25 * sizeof(double)), cudaSuccess);
+        ASSERT_EQ(cudaMalloc(reinterpret_cast<void**>(&d_morton), 25 * sizeof(std::uint64_t)), cudaSuccess);
+        ASSERT_EQ(cudaMalloc(reinterpret_cast<void**>(&d_particle_id), 25 * sizeof(std::uint32_t)), cudaSuccess);
     }
 
     void TearDown() override {
