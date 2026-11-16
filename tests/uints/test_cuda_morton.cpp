@@ -126,7 +126,7 @@ TEST_F(MortonCudaTest, RejectsTooManyParticles) {
 TEST_F(MortonCudaTest, RejectsNullPointers) {
     EXPECT_THROW(
         computeMortonCodesCUDA(
-            d_pos_x, d_pos_y, nullprt,
+            d_pos_x, d_pos_y, nullptr,
             0.0, 0.0, 0.0, 1.0, 1, 25,
             d_morton, d_particle_id
         ),
@@ -197,7 +197,7 @@ TEST_F(MortonCudaTest, Sorts25ParticlesAndPreservesIds) {
     );
     ASSERT_EQ(
         cudaMemcpy(actual_particle_id, d_particle_id, sizeof(actual_particle_id), cudaMemcpyDeviceToHost),
-        cudaSucess
+        cudaSuccess
     );
 
     for (std::size_t i = 0; i < 25; i++) {
