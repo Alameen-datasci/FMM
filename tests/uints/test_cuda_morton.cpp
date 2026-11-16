@@ -178,13 +178,13 @@ TEST_F(MortonCudaTest, Sorts25ParticlesAndPreservesIds) {
     };
     // ==========================================================
 
-    ASSERT_EQ(cudaMemcpy(d_pos_x, x, sizeof(x), cudaMemcpyHostToDevice), cudaSuccess);
-    ASSERT_EQ(cudaMemcpy(d_pos_y, y, sizeof(y), cudaMemcpyHostToDevice), cudaSuccess);
-    ASSERT_EQ(cudaMemcpy(d_pos_z, z, sizeof(z), cudaMemcpyHostToDevice), cudaSuccess);
+    ASSERT_EQ(cudaMemcpy(d_pos_x, x, 25 * sizeof(double), cudaMemcpyHostToDevice), cudaSuccess);
+    ASSERT_EQ(cudaMemcpy(d_pos_y, y, 25 * sizeof(double), cudaMemcpyHostToDevice), cudaSuccess);
+    ASSERT_EQ(cudaMemcpy(d_pos_z, z, 25 * sizeof(double), cudaMemcpyHostToDevice), cudaSuccess);
 
     computeMortonCodesCUDA(
         d_pos_x, d_pos_y, d_pos_z,
-        0.0, 0.0, 0.0, 1.0, 1, 25,
+        0.0, 0.0, 0.0, 1.0, 4, 25,
         d_morton, d_particle_id
     );
 
@@ -192,11 +192,11 @@ TEST_F(MortonCudaTest, Sorts25ParticlesAndPreservesIds) {
     std::uint32_t actual_particle_id[25];
 
     ASSERT_EQ(
-        cudaMemcpy(actual_morton, d_morton, sizeof(actual_morton), cudaMemcpyDeviceToHost),
+        cudaMemcpy(actual_morton, d_morton, 25 * sizeof(std::uint64_t), cudaMemcpyDeviceToHost),
         cudaSuccess
     );
     ASSERT_EQ(
-        cudaMemcpy(actual_particle_id, d_particle_id, sizeof(actual_particle_id), cudaMemcpyDeviceToHost),
+        cudaMemcpy(actual_particle_id, d_particle_id, 25 * sizeof(std::uint32_t), cudaMemcpyDeviceToHost),
         cudaSuccess
     );
 
